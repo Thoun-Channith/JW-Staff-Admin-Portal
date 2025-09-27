@@ -3,7 +3,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import DashboardView from "../views/DashboardView.vue";
 import LoginView from "../views/LoginView.vue";
-import TrackingView from "../views/TrackingView.vue"; // Import the new view
+import TrackingView from "../views/TrackingView.vue";
+import AttendanceView from "../views/AttendanceView.vue"; // Import the new view
+import ReportsView from "../views/ReportsView.vue"; // Import the new view
 
 // Helper to wait for Firebase auth to be ready
 const getCurrentUser = () => {
@@ -24,14 +26,26 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      name: "Dashboard", // Give the route a name
+      name: "Dashboard",
       component: DashboardView,
       meta: { requiresAuth: true },
     },
     {
-      path: "/tracking", // Add the new tracking route
+      path: "/tracking",
       name: "Tracking",
       component: TrackingView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/attendance", // Add the new attendance route
+      name: "Attendance",
+      component: AttendanceView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/reports", // Add the new reports route
+      name: "Reports",
+      component: ReportsView,
       meta: { requiresAuth: true },
     },
     {

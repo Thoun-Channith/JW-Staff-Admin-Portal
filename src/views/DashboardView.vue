@@ -4,25 +4,39 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import AdminLayout from "../layouts/AdminLayout.vue";
 import UpdateStaffModal from "../components/UpdateStaffModal.vue";
-import AddStaffModal from "../components/AddStaffModal.vue"; // 1. Import the new modal
+import AddStaffModal from "../components/AddStaffModal.vue";
 
 const staffList = ref([]);
 const isLoading = ref(true);
+const errorMessage = ref(null); // Added for displaying errors
 const searchQuery = ref("");
 
 // --- State for the modals ---
 const isUpdateModalOpen = ref(false);
-const isAddModalOpen = ref(false); // 2. Add state for the new modal
+const isAddModalOpen = ref(false);
 const selectedStaff = ref(null);
 
 // --- Real-time data fetching ---
 let unsubscribe = null;
 onMounted(() => {
   const q = query(collection(db, "users"), where("role", "==", "staff"));
-  unsubscribe = onSnapshot(q, (snapshot) => {
-    staffList.value = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    isLoading.value = false;
-  });
+  unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      staffList.value = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      isLoading.value = false;
+      errorMessage.value = null; // Clear any previous errors on successful load
+    },
+    (error) => {
+      // --- ADDED ERROR HANDLING ---
+      // This will catch issues like permission-denied from Firestore rules
+      // or missing indexes.
+      console.error("Error fetching staff list:", error);
+      errorMessage.value =
+        "Failed to load staff data. This could be due to database permissions (security rules) or a missing index. Please check the browser console for more details.";
+      isLoading.value = false;
+    }
+  );
 });
 
 onUnmounted(() => {
@@ -59,7 +73,6 @@ const formatTimestamp = (timestamp) => {
   });
 };
 
-// 3. Update modal functions
 function openAddStaffModal() {
   isAddModalOpen.value = true;
 }
@@ -147,6 +160,10 @@ function closeUpdateModal() {
       <div v-if="isLoading" class="p-8 text-center text-gray-500 dark:text-gray-400">
         <p>Loading staff data...</p>
       </div>
+      <!-- ADDED: Error Message Display -->
+      <div v-else-if="errorMessage" class="p-6 text-center text-red-600 rounded-lg bg-red-50">
+        <p>{{ errorMessage }}</p>
+      </div>
       <div v-else>
         <!-- Search and Add New Staff Button -->
         <div class="flex items-center justify-between p-4 border-b dark:border-dark-border">
@@ -225,7 +242,7 @@ function closeUpdateModal() {
                 scope="col"
                 class="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-500 uppercase dark:text-gray-300"
               >
-                Last Activity
+                Last Location
               </th>
               <th
                 scope="col"
@@ -300,7 +317,6 @@ function closeUpdateModal() {
       </div>
     </div>
 
-    <!-- 4. Add the new modal to the template -->
     <AddStaffModal :is-open="isAddModalOpen" @close="closeAddStaffModal" />
 
     <UpdateStaffModal
