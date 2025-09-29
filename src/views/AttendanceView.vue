@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from "vue";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { collection, collectionGroup, onSnapshot, query, orderBy, where } from "firebase/firestore";
 import { db } from "../firebase";
 import AdminLayout from "../layouts/AdminLayout.vue";
 
@@ -9,25 +9,30 @@ const staffList = ref([]);
 const isLoading = ref(true);
 const filterDate = ref(new Date().toISOString().slice(0, 10));
 
-// Fetch staff data to map user IDs to names
 let staffUnsubscribe = null;
+let attendanceUnsubscribe = null;
+
+// Fetch staff data (only role=staff)
 onMounted(() => {
   const staffQuery = query(collection(db, "users"), where("role", "==", "staff"));
   staffUnsubscribe = onSnapshot(staffQuery, (snapshot) => {
     const staff = {};
     snapshot.docs.forEach((doc) => {
-      staff[doc.id] = doc.data().displayName || doc.data().name || "Unknown";
+      staff[doc.id] = {
+        name: doc.data().displayName || doc.data().name || "Unknown",
+        employeeId: doc.data().employeeId || "N/A",
+      };
     });
     staffList.value = staff;
   });
-});
 
-// Fetch attendance data
-let attendanceUnsubscribe = null;
-onMounted(() => {
-  const attendanceQuery = query(collection(db, "attendance"), orderBy("checkInTime", "desc"));
+  // Fetch attendance data (all activity_logs, then filter staff later)
+  const attendanceQuery = query(collectionGroup(db, "activity_logs"), orderBy("timestamp", "desc"));
   attendanceUnsubscribe = onSnapshot(attendanceQuery, (snapshot) => {
-    attendanceRecords.value = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    attendanceRecords.value = snapshot.docs.map((doc) => {
+      const userId = doc.ref.parent.parent.id; // parent user doc id
+      return { id: doc.id, userId: userId, ...doc.data() };
+    });
     isLoading.value = false;
   });
 });
@@ -38,17 +43,58 @@ onUnmounted(() => {
 });
 
 const getStaffName = (userId) => {
-  return staffList.value[userId] || "Unknown";
+  return staffList.value[userId]?.name || "Unknown";
 };
 
-const filteredAttendanceRecords = computed(() => {
-  if (!filterDate.value) {
-    return attendanceRecords.value;
-  }
-  return attendanceRecords.value.filter((record) => {
-    const recordDate = new Date(record.checkInTime.seconds * 1000).toISOString().slice(0, 10);
-    return recordDate === filterDate.value;
-  });
+const getStaffId = (userId) => {
+  return staffList.value[userId]?.employeeId || "N/A";
+};
+
+// Process logs only for staff & selected date
+const processedAttendance = computed(() => {
+  if (!filterDate.value) return [];
+
+  const staffIds = Object.keys(staffList.value);
+  const dailySummary = {};
+
+  attendanceRecords.value
+    .filter((record) => {
+      if (!record.timestamp) return false;
+
+      // ✅ Only keep logs from staff
+      if (!staffIds.includes(record.userId)) return false;
+
+      const recordDate = new Date(record.timestamp.seconds * 1000).toISOString().slice(0, 10);
+      return recordDate === filterDate.value;
+    })
+    .forEach((record) => {
+      const userId = record.userId;
+      if (!dailySummary[userId]) {
+        dailySummary[userId] = {
+          userId: userId,
+          checkInTime: null,
+          checkOutTime: null,
+        };
+      }
+
+      if (record.status === "checked-in") {
+        if (
+          !dailySummary[userId].checkInTime ||
+          record.timestamp.seconds < dailySummary[userId].checkInTime.seconds
+        ) {
+          dailySummary[userId].checkInTime = record.timestamp;
+        }
+      } else if (record.status === "checked-out") {
+        if (
+          !dailySummary[userId].checkOutTime ||
+          record.timestamp.seconds > dailySummary[userId].checkOutTime.seconds
+        ) {
+          dailySummary[userId].checkOutTime = record.timestamp;
+        }
+      }
+    });
+
+  return Object.values(dailySummary);
 });
 
 const formatTimestamp = (timestamp) => {
@@ -60,12 +106,10 @@ const formatTimestamp = (timestamp) => {
 };
 
 const exportToCSV = () => {
-  // Placeholder for CSV export functionality
   alert("Exporting to CSV...");
 };
 
 const exportToPDF = () => {
-  // Placeholder for PDF export functionality
   alert("Exporting to PDF...");
 };
 </script>
@@ -103,44 +147,53 @@ const exportToPDF = () => {
           <thead class="bg-gray-50 dark:bg-gray-700">
             <tr>
               <th
-                scope="col"
+                class="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-500 uppercase dark:text-gray-300"
+              >
+                Staff ID
+              </th>
+              <th
                 class="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-500 uppercase dark:text-gray-300"
               >
                 Staff Name
               </th>
               <th
-                scope="col"
                 class="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-500 uppercase dark:text-gray-300"
               >
-                Check-in Time
+                Check-in Date Time
               </th>
               <th
-                scope="col"
                 class="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-500 uppercase dark:text-gray-300"
               >
-                Check-out Time
+                Check-out Date Time
               </th>
             </tr>
           </thead>
           <tbody
             class="bg-white divide-y divide-gray-200 dark:bg-dark-card dark:divide-dark-border"
           >
-            <tr v-if="filteredAttendanceRecords.length === 0">
-              <td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+            <tr v-if="processedAttendance.length === 0">
+              <td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                 No records found for this date.
               </td>
             </tr>
             <tr
-              v-for="record in filteredAttendanceRecords"
-              :key="record.id"
+              v-for="record in processedAttendance"
+              :key="record.userId"
               class="hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <td
                 class="px-6 py-4 text-sm font-semibold text-gray-600 whitespace-nowrap dark:text-gray-300"
               >
+                {{ getStaffId(record.userId) }}
+              </td>
+              <td
+                class="px-6 py-4 text-sm font-semibold text-gray-600 whitespace-nowrap dark:text-gray-300"
+              >
                 {{ getStaffName(record.userId) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ formatTimestamp(record.checkInTime) }}</td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                {{ formatTimestamp(record.checkInTime) }}
+              </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 {{ formatTimestamp(record.checkOutTime) }}
               </td>

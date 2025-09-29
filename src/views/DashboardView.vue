@@ -8,15 +8,13 @@ import AddStaffModal from "../components/AddStaffModal.vue";
 
 const staffList = ref([]);
 const isLoading = ref(true);
-const errorMessage = ref(null); // Added for displaying errors
+const errorMessage = ref(null);
 const searchQuery = ref("");
 
-// --- State for the modals ---
 const isUpdateModalOpen = ref(false);
 const isAddModalOpen = ref(false);
 const selectedStaff = ref(null);
 
-// --- Real-time data fetching ---
 let unsubscribe = null;
 onMounted(() => {
   const q = query(collection(db, "users"), where("role", "==", "staff"));
@@ -25,12 +23,9 @@ onMounted(() => {
     (snapshot) => {
       staffList.value = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       isLoading.value = false;
-      errorMessage.value = null; // Clear any previous errors on successful load
+      errorMessage.value = null;
     },
     (error) => {
-      // --- ADDED ERROR HANDLING ---
-      // This will catch issues like permission-denied from Firestore rules
-      // or missing indexes.
       console.error("Error fetching staff list:", error);
       errorMessage.value =
         "Failed to load staff data. This could be due to database permissions (security rules) or a missing index. Please check the browser console for more details.";
@@ -43,7 +38,6 @@ onUnmounted(() => {
   if (unsubscribe) unsubscribe();
 });
 
-// --- Computed properties ---
 const totalStaff = computed(() => staffList.value.length);
 const clockedInCount = computed(() => staffList.value.filter((staff) => staff.isClockedIn).length);
 const clockedOutCount = computed(() => totalStaff.value - clockedInCount.value);
@@ -64,7 +58,6 @@ const filteredStaffList = computed(() => {
   });
 });
 
-// --- Helper & Action Functions ---
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "N/A";
   return new Date(timestamp.seconds * 1000).toLocaleString("en-US", {
@@ -96,7 +89,6 @@ function closeUpdateModal() {
 
 <template>
   <AdminLayout>
-    <!-- Stats Cards -->
     <div class="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 lg:grid-cols-3">
       <div class="p-6 bg-white rounded-lg shadow-sm dark:bg-dark-card">
         <div class="flex items-center">
@@ -155,17 +147,14 @@ function closeUpdateModal() {
       </div>
     </div>
 
-    <!-- Staff Table Container -->
     <div class="overflow-x-auto bg-white rounded-lg shadow-sm dark:bg-dark-card">
       <div v-if="isLoading" class="p-8 text-center text-gray-500 dark:text-gray-400">
         <p>Loading staff data...</p>
       </div>
-      <!-- ADDED: Error Message Display -->
       <div v-else-if="errorMessage" class="p-6 text-center text-red-600 rounded-lg bg-red-50">
         <p>{{ errorMessage }}</p>
       </div>
       <div v-else>
-        <!-- Search and Add New Staff Button -->
         <div class="flex items-center justify-between p-4 border-b dark:border-dark-border">
           <div class="relative">
             <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -242,7 +231,7 @@ function closeUpdateModal() {
                 scope="col"
                 class="px-6 py-3 text-xs font-semibold tracking-wider text-left text-gray-500 uppercase dark:text-gray-300"
               >
-                Last Location
+                Last Seen
               </th>
               <th
                 scope="col"
