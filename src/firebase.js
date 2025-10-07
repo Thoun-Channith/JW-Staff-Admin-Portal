@@ -9,13 +9,13 @@ import { getFirestore } from "firebase/firestore";
 // Your web app's Firebase configuration
 // IMPORTANT: Replace this with your project's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCIOBoDO6oOeW-j8mtXFLo2OWZhAIMzaOw",
-  authDomain: "joinery-worx.firebaseapp.com",
-  projectId: "joinery-worx",
-  storageBucket: "joinery-worx.firebasestorage.app",
-  messagingSenderId: "292388889288",
-  appId: "1:292388889288:web:042e1a9242adc479523bfd",
-  measurementId: "G-RRY10H7KF3",
+  apiKey: "AIzaSyCUjaXB6K7YMdBBT0ZJyNzexBMMlylu3kY",
+  authDomain: "jw-staff-tracking-app.firebaseapp.com",
+  projectId: "jw-staff-tracking-app",
+  storageBucket: "jw-staff-tracking-app.firebasestorage.app",
+  messagingSenderId: "984352294269",
+  appId: "1:984352294269:web:eeac3a3b3c897549cc7814",
+  measurementId: "G-ZH0LJ5PG9G",
 };
 
 // Initialize Firebase
